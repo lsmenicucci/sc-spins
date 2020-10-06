@@ -1,9 +1,9 @@
 PYTHON = python3.7
 SRC_FILES = $(wildcard src/*.f90)
-LIB_FILES = ${SRC_FILES:src/%.f90=build/%.so}
+EXT_SUFFIX := $(shell python3.7-config --extension-suffix)
+LIB_FILES = ${SRC_FILES:src/%.f90=%}
 
-%.so: %.f90
-	$(PYTHON) -m numpy.f2py -c $^
+%$(EXT_SUFFIX): src/%.f90
+	$(PYTHON) -m numpy.f2py -c --f90exec=mpif90 -m $* $<
 
-build: 
-	$(PYTHON) -m numpy.f2py -c src/spintronics.f90 -m spintronics
+default: $(LIB_FILES)$(EXT_SUFFIX)
