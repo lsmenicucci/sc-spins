@@ -2,25 +2,25 @@ MODULE spintronics
     IMPLICIT NONE
 
     ! Constants
-    REAL, PARAMETER :: zpi = 4*ATAN(1.0)
+    REAL, PARAMETER :: zpi = 8*ATAN(1.0)
 
     !
     ! Global state variables
     !
 
     ! Spin & position vectos
-    REAL, ALLOCATABLE, DIMENSION(:)  :: sx, sy, sz
-    REAL, ALLOCATABLE, DIMENSION(:)  :: rx, ry, rz
+    REAL(8), ALLOCATABLE, DIMENSION(:)  :: sx, sy, sz
+    REAL(8), ALLOCATABLE, DIMENSION(:)  :: rx, ry, rz
     
     ! Exchange interaction
-    REAL, ALLOCATABLE, DIMENSION(:, :, :)   :: V_exc
-    INTEGER, ALLOCATABLE, DIMENSION(:, :)   :: V_interacts_exc
-    INTEGER, ALLOCATABLE, DIMENSION(:)      :: V_interacts_exc_count
+    REAL(8), ALLOCATABLE, DIMENSION(:, :, :)    :: V_exc
+    INTEGER, ALLOCATABLE, DIMENSION(:, :)       :: V_interacts_exc
+    INTEGER, ALLOCATABLE, DIMENSION(:)          :: V_interacts_exc_count
 
     ! Dipolar interaction
-    REAL, ALLOCATABLE, DIMENSION(:, :, :)   :: V_dip
-    INTEGER, ALLOCATABLE, DIMENSION(:, :)   :: V_interacts_dip
-    INTEGER, ALLOCATABLE, DIMENSION(:)      :: V_interacts_dip_count
+    REAL(8), ALLOCATABLE, DIMENSION(:, :, :)    :: V_dip
+    INTEGER, ALLOCATABLE, DIMENSION(:, :)       :: V_interacts_dip
+    INTEGER, ALLOCATABLE, DIMENSION(:)          :: V_interacts_dip_count
 
     CONTAINS
 
@@ -40,6 +40,12 @@ MODULE spintronics
         IF(.NOT. ALLOCATED(sy)) RETURN
         IF(.NOT. ALLOCATED(sz)) RETURN
         IF(verbose) PRINT *, "Spin vectors allocated: OK"
+
+        ! Check spin vectors
+        IF(.NOT. ALLOCATED(rx)) RETURN
+        IF(.NOT. ALLOCATED(ry)) RETURN
+        IF(.NOT. ALLOCATED(rz)) RETURN
+        IF(verbose) PRINT *, "Position vectors allocated: OK"
 
         ! Check potential related variables
         IF(.NOT. ALLOCATED(V_interacts_exc)) RETURN
@@ -74,10 +80,10 @@ MODULE spintronics
         v_shape = SHAPE(V_dip)
         IF(v_shape(1) /= 3) RETURN
 
-
         ! Check position vectos
         IF(SIZE(rx) /= n) RETURN
         IF(SIZE(ry) /= n) RETURN
+        IF(SIZE(rz) /= n) RETURN
         IF(verbose) PRINT *, "Position vectors have correct size: OK"
 
         check_parameters = .TRUE.
@@ -88,12 +94,12 @@ MODULE spintronics
     SUBROUTINE total_energy(E)
         IMPLICIT NONE 
 
-        REAL, INTENT(OUT) :: E
+        REAL(8), INTENT(OUT) :: E
 
         INTEGER :: n, i, j
         INTEGER :: neib 
-        REAL :: dx, dy, dr
-        REAL :: E_exc, E_dip
+        REAL(8) :: dx, dy, dz, dr
+        REAL(8) :: E_exc, E_dip
 
         n = SIZE(sx)
 
@@ -118,14 +124,15 @@ MODULE spintronics
 
                 dx = rx(i) - rx(neib)
                 dy = ry(i) - ry(neib)
-                dr = SQRT(dx*dx + dy*dy)
+                dz = rz(i) - rz(neib)
+                dr = SQRT(dx*dx + dy*dy + dz*dz)
 
                 E_dip = E_dip + V_dip(1, j, i) * &
                     (3 * (sx(i) * dx) * (sx(neib) * dx)/dr**5 - sx(i) * sx(neib)/dr**3)
                 E_dip = E_dip + V_dip(2, j, i) * &
                     (3 * (sy(i) * dy) * (sy(neib) * dy)/dr**5 - sy(i) * sy(neib)/dr**3)
                 E_dip = E_dip + V_dip(3, j, i) * &
-                    (- sz(i) * sz(neib)/dr**3)
+                    (3 * (sz(i) * dz) * (sz(neib) * dz)/dr**5 - sz(i) * sz(neib)/dr**3)
             END DO
 
         END DO
@@ -145,8 +152,8 @@ MODULE spintronics
         ! Spin site index
         INTEGER :: i
 
-        REAL, DIMENSION(3) :: r
-        REAL :: theta, sxy, s 
+        REAL(8), DIMENSION(3) :: r
+        REAL(8) :: theta, sxy, s 
 
         CALL RANDOM_NUMBER(r)
         
@@ -164,23 +171,27 @@ MODULE spintronics
 
 
     !> Perform n steps of metropolis simmulation on the current configuration
-    SUBROUTINE metropolis(steps, beta, mean_energy)
+    SUBROUTINE metropolis(steps, beta, mean_energy, mean_mag_x, mean_mag_y, mean_mag_z)
         IMPLICIT NONE   
 
         !> Number of steops
         INTEGER, INTENT(IN) :: steps
-        REAL, INTENT(IN) :: beta
-        REAL, INTENT(OUT) :: mean_energy
+        REAL(8), INTENT(IN) :: beta
+        REAL(8), INTENT(OUT) :: mean_energy
+        REAL(8), INTENT(OUT) :: mean_mag_x
+        REAL(8), INTENT(OUT) :: mean_mag_y
+        REAL(8), INTENT(OUT) :: mean_mag_z
+
 
         ! Local variables
         INTEGER :: step, i, j, k, neib
         INTEGER :: n
 
         ! Iteration state variables
-        REAL :: current_energy, delta_energy, r
-        REAL :: sx_hold, sy_hold, sz_hold
-        REAL :: sx_delta, sy_delta, sz_delta
-        REAL :: dx, dy, dr
+        REAL(8) :: current_energy, delta_energy, r
+        REAL(8) :: sx_hold, sy_hold, sz_hold
+        REAL(8) :: sx_delta, sy_delta, sz_delta
+        REAL(8) :: dx, dy, dz, dr
 
         ! Check parameters
         IF(.NOT. check_parameters(.FALSE.)) THEN 
@@ -195,6 +206,9 @@ MODULE spintronics
         CALL total_energy(current_energy)
 
         mean_energy = 0
+        mean_mag_x = 0
+        mean_mag_y = 0
+        mean_mag_z = 0
 
         ! Perform simulation
         DO step = 1, steps
@@ -231,14 +245,15 @@ MODULE spintronics
 
                     dx = rx(i) - rx(neib)
                     dy = ry(i) - ry(neib)
-                    dr = SQRT(dx*dx + dy*dy)
+                    dz = rz(i) - rz(neib)
+                    dr = SQRT(dx*dx + dy*dy + dz*dz)
 
                     delta_energy = delta_energy + V_dip(1, j, i) * &
                         (3 * (sx_delta * dx) * (sx(neib) * dx)/dr**5 - sx_delta * sx(neib)/dr**3)
                     delta_energy = delta_energy + V_dip(2, j, i) * &
                         (3 * (sy_delta * dy) * (sy(neib) * dy)/dr**5 - sy_delta * sy(neib)/dr**3)
                     delta_energy = delta_energy + V_dip(3, j, i) * &
-                        (- sz_delta * sz(neib)/dr**3)
+                        (3 * (sz_delta * dz) * (sz(neib) * dz)/dr**5 - sz_delta * sz(neib)/dr**3)
                 END DO
 
                 ! Update energy
@@ -260,9 +275,143 @@ MODULE spintronics
                 END IF
             END DO
 
-            mean_energy = mean_energy + current_energy/REAL(steps)
+            mean_energy = mean_energy + current_energy/DBLE(steps)
+            mean_mag_x = mean_mag_x + SUM(sx)/DBLE(steps)
+            mean_mag_y = mean_mag_y + SUM(sy)/DBLE(steps)
+            mean_mag_z = mean_mag_z + SUM(sz)/DBLE(steps)
 
         END DO
 	END SUBROUTINE
+
+    !> Calculates the spin commutator with H for a given configuration 
+    SUBROUTINE spin_commutator(n, spin_x, spin_y, spin_z, commu_x, commu_y, commu_z)
+        IMPLICIT NONE 
+
+        INTEGER, INTENT(IN) :: n
+        REAL(8), DIMENSION(n), INTENT(IN) :: spin_x
+        REAL(8), DIMENSION(n), INTENT(IN) :: spin_y
+        REAL(8), DIMENSION(n), INTENT(IN) :: spin_z
+        REAL(8), DIMENSION(n), INTENT(OUT) :: commu_x
+        REAL(8), DIMENSION(n), INTENT(OUT) :: commu_y
+        REAL(8), DIMENSION(n), INTENT(OUT) :: commu_z
+        
+        ! Internal variables
+        REAL(8), DIMENSION(n) :: cx, cy, cz
+        REAL(8) :: dx, dy, dz, dr
+        INTEGER :: i, j, neib
+
+        ! Calculate commutators for each component
+        cx = spin_z - spin_y
+        cy = spin_x - spin_z
+        cz = spin_y - spin_x
+
+        ! Initialize accumulator variable
+        commu_x = 0
+        commu_y = 0
+        commu_z = 0
+
+        DO i = 1, n
+            ! Sum exchange contribution
+            DO j = 1, V_interacts_exc_count(i)
+                neib = V_interacts_exc(j, i)
+
+                commu_x(i) = commu_x(i) + V_exc(1, j, i) * sx(neib) * cx(i)
+                commu_y(i) = commu_y(i) + V_exc(2, j, i) * sy(neib) * cy(i)
+                commu_z(i) = commu_z(i) + V_exc(3, j, i) * sz(neib) * cz(i)
+            END DO
+
+            ! Sum dipolar contribution
+            DO j = 1, V_interacts_dip_count(i)
+                neib = V_interacts_dip(j, i)
+
+                dx = rx(i) - rx(neib)
+                dy = ry(i) - ry(neib)
+                dz = rz(i) - rz(neib)
+                dr = SQRT(dx*dx + dy*dy + dz*dz)
+
+               commu_x(i) = commu_x(i) + V_dip(1, j, i) * &
+                        (3 * (cx(i) * dx) * (sx(neib) * dx)/dr**5 - cx(i) * sx(neib)/dr**3)
+
+                commu_y(i) = commu_y(i) + V_dip(2, j, i) * &
+                        (3 * (cy(i) * dy) * (sy(neib) * dy)/dr**5 - cy(i) * sy(neib)/dr**3)
+
+                commu_z(i) = commu_z(i) + V_dip(3, j, i) * &
+                        (3 * (cz(i) * dz) * (sz(neib) * dz)/dr**5 - cz(i) * sz(neib)/dr**3)
+            END DO
+        END DO
+
+    END SUBROUTINE
+
+    SUBROUTINE integrate(time, dt)
+        IMPLICIT NONE
+
+        REAL(8), INTENT(IN) :: time
+        REAL(8), INTENT(IN) :: dt
+
+        ! Internal variables
+        REAL(8), DIMENSION(:, :), ALLOCATABLE :: com_sx, com_sy, com_sz
+        REAL(8), DIMENSION(:), ALLOCATABLE :: pre_sx, pre_sy, pre_sz
+        INTEGER :: steps, t, n, i
+
+        ! Allocate buffer vectors
+        n = SIZE(sx)
+
+        ! Functions f(y_{i}), f(y_{i - 1}), f(y_{i - 2}), f(y_{i - 3})
+        ALLOCATE(com_sx(4, n))
+        ALLOCATE(com_sy(4, n))
+        ALLOCATE(com_sz(4, n))
+
+        ! Predictors P(y_{i}), P(y_{i - 1}), P(y_{i - 2}), P(y_{i - 3})
+        ALLOCATE(pre_sx(n))
+        ALLOCATE(pre_sy(n))
+        ALLOCATE(pre_sz(n))
+
+        ! Start integration
+        steps = INT(time/dt)
+
+        DO t = 1, steps 
+            ! Calculate the predicted value
+            pre_sx = sx + & 
+                (dt/24.0) * ( 55.0 * com_sx(1, :) - 59.0 * com_sx(2, :) + &
+                                37.0 * com_sx(3, :) - 9.0 * com_sx(4, :) )
+            pre_sy = sy + & 
+                (dt/24.0) * ( 55.0 * com_sy(1, :) - 59.0 * com_sy(2, :) + &
+                                37.0 * com_sy(3, :) - 9.0 * com_sy(4, :) )
+            pre_sz = sz + & 
+                (dt/24.0) * ( 55.0 * com_sz(1, :) - 59.0 * com_sz(2, :) + &
+                                37.0 * com_sz(3, :) - 9.0 * com_sz(4, :) )
+
+            ! Overwrite the last commutator value with the predictor
+            CALL spin_commutator(n, pre_sx, pre_sy, pre_sz, com_sx(4, :), com_sy(4, :), com_sz(4, :))
+
+            ! Compute the next spins
+            sx = sx + & 
+                (dt/24.0) * ( 9.0 * com_sx(4, :) + 19.0 * com_sx(1, :) - &
+                                5.0 * com_sx(2, :) - com_sx(3, :) )
+            sy = sy + & 
+                (dt/24.0) * ( 9.0 * com_sy(4, :) + 19.0 * com_sy(1, :) - &
+                                5.0 * com_sy(2, :) - com_sy(3, :) )
+            sz = sz + & 
+                (dt/24.0) * ( 9.0 * com_sz(4, :) + 19.0 * com_sz(1, :) - &
+                                5.0 * com_sz(2, :) - com_sz(3, :) )
+
+            ! Reorder the buffer values
+            com_sx(4, :) = com_sx(3, :)
+            com_sy(4, :) = com_sy(3, :)
+            com_sz(4, :) = com_sz(3, :)
+
+            com_sx(3, :) = com_sx(2, :)
+            com_sy(3, :) = com_sy(2, :)
+            com_sz(3, :) = com_sz(2, :)
+
+            com_sx(2, :) = com_sx(1, :)
+            com_sy(2, :) = com_sy(1, :)
+            com_sz(2, :) = com_sz(1, :) 
+
+            ! Calculate the commutator for the current configuration
+            CALL spin_commutator(n, sx, sy, sz, com_sx(1, :), com_sy(1, :), com_sz(1, :))
+        END DO
+
+    END SUBROUTINE
 
 END MODULE spintronics
