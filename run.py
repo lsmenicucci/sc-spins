@@ -36,25 +36,32 @@ plt.rcParams['savefig.dpi'] = 500
 
 L = 10
 a = 1.0
-dipolar_cut = 20.0
+dipolar_cut = 1.1
 J = -1.0
-D = -0.5
-beta = 1/0.7
+D = -1.0
+beta = 1/1.0
 
 spintronicGeometries.initialize_disk(spintronics, 7, 1, a, dipolar_cut, J, D)
-#initialize_square_layers(L, 1, a, dipolar_cut, J, D)
+#spintronicGeometries.initialize_line(spintronics, 2, a, dipolar_cut, J, D)
+
 
 logger.info(f'Thermalizing the system')
 t_start = time.time()
-spintronics.metropolis(int(1e3), beta)
+
+spintronics.metropolis(int(1e4), beta)
+
 logger.info(f"Thermalization done in {time.time() - t_start:7.2f} seconds")
 
-logger.info(f'Measuring the system')
-t_start = time.time()
-results = spintronics.metropolis(int(1e3), beta)
+logger.info(f"Energy before integration = {spintronics.total_energy():12.6f}")
+spintronics.integrate(10, 0.005)
+logger.info(f"Energy after integration = {spintronics.total_energy():12.6f}")
 
-logger.info(f"Measurement done in {time.time() - t_start:7.2f} seconds")
-logger.debug(f"Measurement output is: {results}")
+# logger.info(f'Measuring the system')
+# t_start = time.time()
+# results = spintronics.metropolis(int(1e5), beta)
+
+# logger.info(f"Measurement done in {time.time() - t_start:7.2f} seconds")
+# logger.debug(f"Measurement output is: {results}")
 
 # print(f"- Mean energy: {results[0]:12.6f}")
 # print(f"- Mean mag_x:  {results[1]:12.6f}")
@@ -62,7 +69,7 @@ logger.debug(f"Measurement output is: {results}")
 # print(f"- Mean mag_z:  {results[3]:12.6f}")
 
 # print("Plotting")
-fig, ax = plot_current_config_2d()
+# fig, ax = plot_current_config_2d()
 
-fig.suptitle(fr'$D = {D}, Dcut = {dipolar_cut:4.2f}, \beta = {beta}$')
-plt.savefig(f'test - {rank}.png')
+# fig.suptitle(fr'$D = {D}, Dcut = {dipolar_cut:4.2f}, \beta = {beta}$')
+# plt.savefig(f'test - {rank}.png')

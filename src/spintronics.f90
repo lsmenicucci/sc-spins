@@ -296,14 +296,9 @@ MODULE spintronics
         REAL(8), DIMENSION(n), INTENT(OUT) :: commu_z
         
         ! Internal variables
-        REAL(8), DIMENSION(n) :: cx, cy, cz
+        REAL(8) :: cx, cy, cz, rcx, rcy, rcz
         REAL(8) :: dx, dy, dz, dr
         INTEGER :: i, j, neib
-
-        ! Calculate commutators for each component
-        cx = spin_z - spin_y
-        cy = spin_x - spin_z
-        cz = spin_y - spin_x
 
         ! Initialize accumulator variable
         commu_x = 0
@@ -315,9 +310,13 @@ MODULE spintronics
             DO j = 1, V_interacts_exc_count(i)
                 neib = V_interacts_exc(j, i)
 
-                commu_x(i) = commu_x(i) + V_exc(1, j, i) * sx(neib) * cx(i)
-                commu_y(i) = commu_y(i) + V_exc(2, j, i) * sy(neib) * cy(i)
-                commu_z(i) = commu_z(i) + V_exc(3, j, i) * sz(neib) * cz(i)
+                cx = spin_y(neib) * spin_z(i) - spin_y(i) * spin_z(neib)
+                cy = spin_z(neib) * spin_x(i) - spin_z(i) * spin_x(neib)
+                cz = spin_x(neib) * spin_y(i) - spin_x(i) * spin_y(neib)
+
+                commu_x(i) = commu_x(i) + V_exc(1, j, i) * cx
+                commu_y(i) = commu_y(i) + V_exc(2, j, i) * cy
+                commu_z(i) = commu_z(i) + V_exc(3, j, i) * cz
             END DO
 
             ! Sum dipolar contribution
@@ -329,14 +328,23 @@ MODULE spintronics
                 dz = rz(i) - rz(neib)
                 dr = SQRT(dx*dx + dy*dy + dz*dz)
 
-               commu_x(i) = commu_x(i) + V_dip(1, j, i) * &
-                        (3 * (cx(i) * dx) * (sx(neib) * dx)/dr**5 - cx(i) * sx(neib)/dr**3)
+                ! Compute terms
+                cx = spin_y(neib) * spin_z(i) - spin_y(i) * spin_z(neib)
+                cy = spin_z(neib) * spin_x(i) - spin_z(i) * spin_x(neib)
+                cz = spin_x(neib) * spin_y(i) - spin_x(i) * spin_y(neib)
+
+                rcx = dy * spin_z(i) - spin_y(i) * dz
+                rcy = dz * spin_x(i) - spin_z(i) * dx
+                rcz = dx * spin_y(i) - spin_x(i) * dy
+
+                commu_x(i) = commu_x(i) + V_dip(1, j, i) * &
+                        (3 * rcx * (spin_x(neib) * dx)/dr**5 - cx/dr**3)
 
                 commu_y(i) = commu_y(i) + V_dip(2, j, i) * &
-                        (3 * (cy(i) * dy) * (sy(neib) * dy)/dr**5 - cy(i) * sy(neib)/dr**3)
+                        (3 * rcy * (spin_y(neib) * dy)/dr**5 - cy/dr**3)
 
                 commu_z(i) = commu_z(i) + V_dip(3, j, i) * &
-                        (3 * (cz(i) * dz) * (sz(neib) * dz)/dr**5 - cz(i) * sz(neib)/dr**3)
+                        (3 * rcz * (spin_z(neib) * dz)/dr**5 - cz/dr**3)
             END DO
         END DO
 
@@ -350,6 +358,7 @@ MODULE spintronics
 
         ! Internal variables
         REAL(8), DIMENSION(:, :), ALLOCATABLE :: com_sx, com_sy, com_sz
+        REAL(8), DIMENSION(:, :), ALLOCATABLE :: kx, ky, kz
         REAL(8), DIMENSION(:), ALLOCATABLE :: pre_sx, pre_sy, pre_sz
         INTEGER :: steps, t, n, i
 
@@ -366,6 +375,49 @@ MODULE spintronics
         ALLOCATE(pre_sy(n))
         ALLOCATE(pre_sz(n))
 
+        ! Functions f(y_{i}), f(y_{i - 1}), f(y_{i - 2}), f(y_{i - 3})
+        ALLOCATE(kx(4, n))
+        ALLOCATE(ky(4, n))
+        ALLOCATE(kz(4, n))
+
+        ! Fill initial values with Runge-Kutta
+        DO t = 1, 4
+            ! Calculate k1
+            CALL spin_commutator(n, sx, sy, sz, &
+                                    kx(1, :), ky(1, :), kz(1, :))
+            ! Calculate k2
+            CALL spin_commutator(n, sx + dt*kx(1, :)/2.0, sy + dt*ky(1, :)/2.0, sz + dt*kz(1, :)/2.0, &
+                                    kx(2, :), ky(2, :), kz(2, :))
+            ! Calculate k3
+            CALL spin_commutator(n, sx + dt*kx(2, :)/2.0, sy + dt*ky(2, :)/2.0, sz + dt*kz(2, :)/2.0, &
+                                    kx(3, :), ky(3, :), kz(3, :))
+            ! Calculate k4
+            CALL spin_commutator(n, sx + dt*kx(3, :), sy + dt*ky(3, :), sz + dt*kz(3, :), &
+                                    kx(4, :), ky(4, :), kz(4, :))
+
+            sx = sx + (kx(1, :) + kx(2, :) + kx(3, :) + kx(4, :))*dt/6.0
+            sy = sy + (ky(1, :) + ky(2, :) + ky(3, :) + ky(4, :))*dt/6.0
+            sz = sz + (kz(1, :) + kz(2, :) + kz(3, :) + kz(4, :))*dt/6.0
+
+            ! PRINT *, ""
+            ! PRINT *, "step ", t
+            ! PRINT *, sx
+            ! PRINT *, sy
+            ! PRINT *, sz
+            ! PRINT *, (kx(1, :) + kx(2, :) + kx(3, :) + kx(4, :))*dt/6.0
+            ! PRINT *, (ky(1, :) + ky(2, :) + ky(3, :) + ky(4, :))*dt/6.0
+            ! PRINT *, (kz(1, :) + kz(2, :) + kz(3, :) + kz(4, :))*dt/6.0
+            
+            com_sx(5 - i,:) = kx(1, :)
+            com_sy(5 - i,:) = ky(1, :)
+            com_sz(5 - i,:) = kz(1, :)
+        END DO
+
+        ! Clear Runge-Kutta variables
+        DEALLOCATE(kx)
+        DEALLOCATE(ky)
+        DEALLOCATE(kz)
+
         ! Start integration
         steps = INT(time/dt)
 
@@ -373,13 +425,13 @@ MODULE spintronics
             ! Calculate the predicted value
             pre_sx = sx + & 
                 (dt/24.0) * ( 55.0 * com_sx(1, :) - 59.0 * com_sx(2, :) + &
-                                37.0 * com_sx(3, :) - 9.0 * com_sx(4, :) )
+                              37.0 * com_sx(3, :) - 9.0 * com_sx(4, :) )
             pre_sy = sy + & 
                 (dt/24.0) * ( 55.0 * com_sy(1, :) - 59.0 * com_sy(2, :) + &
-                                37.0 * com_sy(3, :) - 9.0 * com_sy(4, :) )
+                              37.0 * com_sy(3, :) - 9.0 * com_sy(4, :) )
             pre_sz = sz + & 
                 (dt/24.0) * ( 55.0 * com_sz(1, :) - 59.0 * com_sz(2, :) + &
-                                37.0 * com_sz(3, :) - 9.0 * com_sz(4, :) )
+                              37.0 * com_sz(3, :) - 9.0 * com_sz(4, :) )
 
             ! Overwrite the last commutator value with the predictor
             CALL spin_commutator(n, pre_sx, pre_sy, pre_sz, com_sx(4, :), com_sy(4, :), com_sz(4, :))
@@ -387,13 +439,13 @@ MODULE spintronics
             ! Compute the next spins
             sx = sx + & 
                 (dt/24.0) * ( 9.0 * com_sx(4, :) + 19.0 * com_sx(1, :) - &
-                                5.0 * com_sx(2, :) - com_sx(3, :) )
+                              5.0 * com_sx(2, :) - com_sx(3, :) )
             sy = sy + & 
                 (dt/24.0) * ( 9.0 * com_sy(4, :) + 19.0 * com_sy(1, :) - &
-                                5.0 * com_sy(2, :) - com_sy(3, :) )
+                              5.0 * com_sy(2, :) - com_sy(3, :) )
             sz = sz + & 
                 (dt/24.0) * ( 9.0 * com_sz(4, :) + 19.0 * com_sz(1, :) - &
-                                5.0 * com_sz(2, :) - com_sz(3, :) )
+                              5.0 * com_sz(2, :) - com_sz(3, :) )
 
             ! Reorder the buffer values
             com_sx(4, :) = com_sx(3, :)

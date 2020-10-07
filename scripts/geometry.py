@@ -50,8 +50,8 @@ def initialize_general_geometry(spintronics, points, a, dipolar_cut, J, D):
 	spintronics.rz = list(map(lambda p: p[2], points))
 	
 	# Initialize spin vectors
-	spintronics.sx = np.ones(n)
-	spintronics.sy = np.ones(n)
+	spintronics.sx = np.zeros(n)
+	spintronics.sy = np.zeros(n)
 	spintronics.sz = np.ones(n)	
 
 	# get neibs
@@ -108,5 +108,13 @@ def initialize_square_layers(spintronics, L, layers, a, dipolar_cut, J, D):
 		for k in range(layers)
 		for j in range(-slimit, slimit + 1) 
 		for i in range(-slimit, slimit + 1) ]
+
+	initialize_general_geometry(spintronics, points, a, dipolar_cut, J, D)
+
+def initialize_line(spintronics, L, a, dipolar_cut, J, D):
+	logger.info(f'Initializing line geometry with length = {L}')
+
+	points = [ (i*a, 0, 0) 
+		for i in range(0, L) ]
 
 	initialize_general_geometry(spintronics, points, a, dipolar_cut, J, D)
