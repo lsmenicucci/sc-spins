@@ -87,6 +87,7 @@ def initialize_general_geometry(spintronics, points, a, dipolar_cut, J, D):
 			spintronics.v_interacts_dip[dip_j, i] = dip_neibs[i][dip_j] + 1
 
 	logger.debug('Done setting geometry')
+	return points
 
 def initialize_disk(spintronics, r, layers, a, dipolar_cut, J, D):
 	logger.info(f'Initializing disk geometry with {layers} layers and radius = {r}')
@@ -98,7 +99,7 @@ def initialize_disk(spintronics, r, layers, a, dipolar_cut, J, D):
 		for i in range(-slimit, slimit + 1) 
 			if i**2 + j**2 < r**2  ]
 
-	initialize_general_geometry(spintronics, points, a, dipolar_cut, J, D)
+	return initialize_general_geometry(spintronics, points, a, dipolar_cut, J, D)
 
 def initialize_square_layers(spintronics, L, layers, a, dipolar_cut, J, D):
 	logger.info(f'Initializing square geometry with {layers} layers and side = {L}')
@@ -109,7 +110,7 @@ def initialize_square_layers(spintronics, L, layers, a, dipolar_cut, J, D):
 		for j in range(-slimit, slimit + 1) 
 		for i in range(-slimit, slimit + 1) ]
 
-	initialize_general_geometry(spintronics, points, a, dipolar_cut, J, D)
+	return initialize_general_geometry(spintronics, points, a, dipolar_cut, J, D)
 
 def initialize_line(spintronics, L, a, dipolar_cut, J, D):
 	logger.info(f'Initializing line geometry with length = {L}')
@@ -117,4 +118,4 @@ def initialize_line(spintronics, L, a, dipolar_cut, J, D):
 	points = [ (i*a, 0, 0) 
 		for i in range(0, L) ]
 
-	initialize_general_geometry(spintronics, points, a, dipolar_cut, J, D)
+	return initialize_general_geometry(spintronics, points, a, dipolar_cut, J, D)

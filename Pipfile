@@ -10,6 +10,10 @@ numpy = "*"
 scipy = "*"
 matplotlib = "*"
 mpi4py = "*"
+cython = "*"
+pyopengl = "*"
+triangle = "*"
+glumpy = "*"
 
 [requires]
 python_version = "3.7"

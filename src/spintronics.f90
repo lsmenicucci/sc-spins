@@ -22,6 +22,9 @@ MODULE spintronics
     INTEGER, ALLOCATABLE, DIMENSION(:, :)       :: V_interacts_dip
     INTEGER, ALLOCATABLE, DIMENSION(:)          :: V_interacts_dip_count
 
+    ! Log
+    REAL(8), ALLOCATABLE, DIMENSION(:)  :: energy_log
+
     CONTAINS
 
     !> Check the global parameters
@@ -172,6 +175,7 @@ MODULE spintronics
 
     !> Perform n steps of metropolis simmulation on the current configuration
     SUBROUTINE metropolis(steps, beta, mean_energy, mean_mag_x, mean_mag_y, mean_mag_z)
+        !f2py threadsafe
         IMPLICIT NONE   
 
         !> Number of steops
@@ -351,6 +355,7 @@ MODULE spintronics
     END SUBROUTINE
 
     SUBROUTINE integrate(time, dt)
+        !f2py threadsafe
         IMPLICIT NONE
 
         REAL(8), INTENT(IN) :: time
@@ -421,6 +426,10 @@ MODULE spintronics
         ! Start integration
         steps = INT(time/dt)
 
+        ! Allocate log
+        IF(ALLOCATED(energy_log)) DEALLOCATE(energy_log)
+        ALLOCATE(energy_log(steps))
+
         DO t = 1, steps 
             ! Calculate the predicted value
             pre_sx = sx + & 
@@ -462,6 +471,9 @@ MODULE spintronics
 
             ! Calculate the commutator for the current configuration
             CALL spin_commutator(n, sx, sy, sz, com_sx(1, :), com_sy(1, :), com_sz(1, :))
+
+            ! Calculate the energy
+            energy_log(i) = SUM(sx)/SIZE(sx)
         END DO
 
     END SUBROUTINE
