@@ -84,6 +84,9 @@ def initialize_general_geometry(spintronics, points, a=1.0, dipolar_cut=None, J=
     # Initialize spin constants
     spintronics.spin = np.ones(n)
 
+    if('spin' in kwargs):
+        spintronics.spin = kwargs["spin"]
+
     # get neibs
     if('J_neibs' in kwargs):
         logging.debug(f"Using provided exchange neibs with size = {len(kwargs['J_neibs'])}")

@@ -3,6 +3,7 @@ MODULE spintronics
 
     ! Constants
     REAL, PARAMETER :: zpi = 8*ATAN(1.0)
+    REAL, PARAMETER :: pi = 4*ATAN(1.0)
 
     !
     ! Global state variables
@@ -166,12 +167,13 @@ MODULE spintronics
         CALL RANDOM_NUMBER(r)
 
         ! Generate a random spin size
-        s = (spin(i) - FLOOR(spin(i))) + FLOOR(spin(i)*r(1))
+        s = (spin(i) - FLOOR(spin(i))) + REAL(NINT(spin(i)*r(1)))
 
-        ! Set sz
-        sz(i) = s*(2*r(2) - 1)
+        ! Set sz and sxy
+        sz(i) = 2 * r(2) - 1
+        sxy = s * SQRT(1- sz(i)**2)
+        sz(i) = s * sz(i)
 
-        sxy = s * SQRT(1 - sz(i)**2)
         theta = r(3) * zpi
 
         ! Set sx and sy
@@ -179,7 +181,6 @@ MODULE spintronics
         sy(i) = sxy * SIN(theta)
 
     END SUBROUTINE
-
 
     !> Perform n steps of metropolis simmulation on the current configuration
     SUBROUTINE metropolis(steps, beta, mean_energy, mean_mag_x, mean_mag_y, mean_mag_z)
@@ -485,5 +486,55 @@ MODULE spintronics
         END DO
 
     END SUBROUTINE
+
+    SUBROUTINE has_vortex(path_size, path, type)
+        IMPLICIT NONE
+
+        INTEGER, INTENT(IN) :: path_size
+        INTEGER, DIMENSION(path_size), INTENT(IN) :: path
+        INTEGER, INTENT(OUT)    ::  type
+        !> A flag to indicate the vortex type, 1 for vortex, -1 for anti-vortex and 0 for none of them
+
+        !
+        !   Internal Variables
+        !
+        
+        INTEGER     ::  n, nv, node, node_v
+        REAL(8)     ::  theta1, theta2
+        REAL(8)     ::  vorticity
+
+        ! Initialize the voriticy
+        vorticity = 0
+        type = 0
+
+        ! Integrate through the path
+        DO n = 1, path_size
+            ! Set the neib index
+            nv = MERGE(n + 1, 1, n < path_size)
+
+            node = path(n)
+            node_v = path(nv)
+
+            ! If any vector is 0, there's no vortice
+            IF( sx(node) * sx(node) + sy(node) * sy(node) == 0) RETURN
+            IF( sx(node_v) * sx(node_v) + sy(node_v) * sy(node_v) == 0) RETURN
+            
+
+            ! Find the azimutal angle
+            theta1 = MOD( ATAN2(sy(node), sx(node)) + zpi, zpi )
+            theta2 = MOD( ATAN2(sy(node_v), sx(node_v)) + zpi, zpi )
+
+            IF (ABS(theta2 - theta1) <= pi) THEN 
+                vorticity = vorticity + theta2 - theta1
+            ELSE
+                vorticity = vorticity + SIGN(zpi - ABS(theta2 - theta1), theta1 - theta2 )
+            END IF
+
+        END DO
+        
+        IF ( ABS(vorticity - zpi) < 1e-9 ) type = 1
+        IF ( ABS(vorticity + zpi) < 1e-9 ) type = -1
+
+    END SUBROUTINE has_vortex
 
 END MODULE spintronics

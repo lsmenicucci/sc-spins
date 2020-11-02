@@ -46,12 +46,7 @@ class SpintronicsDynamics(threading.Thread):
 
 plt.rcParams['savefig.dpi'] = 500
 
-L = 10
-a = 1.0
-dipolar_cut = 15.0
-J = -1.0
-D = -1.0
-beta = 1 / 1.0
+kekulene_vortex_path = np.array(range(32, 49), dtype=np.int8)
 
 
 def run_task(task):
@@ -59,13 +54,14 @@ def run_task(task):
         spintronics, task['geometry']['type'], task['geometry']['parameters'])
 
     camera = SpintronicsSnapshoter(spintronics, 'test.h5', task)
-    camera.snapshot()
 
     logger.info(f'Measuring the system')
     t_start = time.time()
+    results = spintronics.metropolis(
+        int(task['parameters']['mc_steps']), task['parameters']["beta"])
+    camera.snapshot(beta=task['parameters']["beta"])
 
-    results = spintronics.metropolis(int(1e3), beta)
-    camera.snapshot(beta=beta)
+    logger.info(f"Current configuration has vortex = {spintronics.has_vortex(kekulene_vortex_path)}")
 
     logger.info(f"Measurement done in {time.time() - t_start:7.2f} seconds")
     logger.debug(f"Measurement output is: {results}")
@@ -75,6 +71,7 @@ def run_task(task):
 
 
 if __name__ == '__main__':
+
     task_data = read_input_tasks('./run.json')
     tasks = []
     for group in task_data["task_groups"]:
@@ -86,7 +83,10 @@ if __name__ == '__main__':
             })
 
     run_task(tasks[0])
+    configuration_plot.plot_current_config_2d(spintronics)
+    plt.show()
     sys.exit()
+
     with MPIPoolExecutor(max_workers=2) as executor:
         res = executor.submit(run_task, tasks[0])
         res.result()
