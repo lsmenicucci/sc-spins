@@ -10,34 +10,36 @@ This handler is used to deal with logging with mpi4py in Python3.
 """
 
 #%% mpi4py logging handler
-from mpi4py import MPI 
+from mpi4py import MPI
 import logging
+import sys
 from os.path import abspath
 
-class MPIFileHandler(logging.FileHandler):                                      
+
+class MPIFileHandler(logging.FileHandler):
     def __init__(self,
                  filename,
-                 mode=MPI.MODE_WRONLY|MPI.MODE_CREATE|MPI.MODE_APPEND ,
-                 encoding='utf-8',  
+                 mode=MPI.MODE_WRONLY | MPI.MODE_CREATE | MPI.MODE_APPEND,
+                 encoding='utf-8',
                  delay=False,
-                 comm=MPI.COMM_WORLD ):                                                
-        self.baseFilename = abspath(filename)                           
-        self.mode = mode                                                        
-        self.encoding = encoding                                            
-        self.comm = comm                                                        
-        if delay:                                                               
-            #We don't open the stream, but we still need to call the            
-            #Handler constructor to set level, formatter, lock etc.             
-            logging.Handler.__init__(self)                                      
-            self.stream = None                                                  
-        else:                                                                   
-           logging.StreamHandler.__init__(self, self._open())                   
-                                                                                
-    def _open(self):                                                            
-        stream = MPI.File.Open( self.comm, self.baseFilename, self.mode )     
-        stream.Set_atomicity(True)                                              
+                 comm=MPI.COMM_WORLD):
+        self.baseFilename = abspath(filename)
+        self.mode = mode
+        self.encoding = encoding
+        self.comm = comm
+        if delay:
+            # We don't open the stream, but we still need to call the
+            # Handler constructor to set level, formatter, lock etc.
+            logging.Handler.__init__(self)
+            self.stream = None
+        else:
+            logging.StreamHandler.__init__(self, self._open())
+
+    def _open(self):
+        stream = MPI.File.Open(self.comm, self.baseFilename, self.mode)
+        stream.Set_atomicity(True)
         return stream
-                                                    
+
     def emit(self, record):
         """
         Emit a record.
@@ -47,7 +49,7 @@ class MPIFileHandler(logging.FileHandler):
         traceback.print_exception and appended to the stream.  If the stream
         has an 'encoding' attribute, it is used to determine how to do the
         output to the stream.
-        
+
         Modification:
             stream is MPI.File, so it must use `Write_shared` method rather
             than `write` method. And `Write_shared` method only accept 
@@ -57,13 +59,36 @@ class MPIFileHandler(logging.FileHandler):
         try:
             msg = self.format(record)
             stream = self.stream
-            stream.Write_shared((msg+self.terminator).encode(self.encoding))
-            #self.flush()
+            stream.Write_shared((msg + self.terminator).encode(self.encoding))
+            # self.flush()
         except Exception:
             self.handleError(record)
-                                                         
-    def close(self):                                                            
-        if self.stream:                                                         
-            self.stream.Sync()                                                  
-            self.stream.Close()                                                 
-            self.stream = None              
+
+    def close(self):
+        if self.stream:
+            self.stream.Sync()
+            self.stream.Close()
+            self.stream = None
+
+
+def get_logger(logger_name):
+    # Get MPI communicator
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+
+    # Start logging
+    logger = logging.getLogger(f"rank[{comm.rank}]({logger_name})")
+    logger.setLevel(logging.DEBUG)
+
+    mh = MPIFileHandler("spintronics.log")
+    formatter = logging.Formatter(
+        '%(asctime)s: %(name)s %(levelname)s: %(message)s', "[(%d/%m) %H:%M:%S]")
+    mh.setFormatter(formatter)
+
+    stdout_h = logging.StreamHandler(sys.stdout)
+    stdout_h.setFormatter(formatter)
+
+    logger.addHandler(mh)
+    logger.addHandler(stdout_h)
+
+    return logger

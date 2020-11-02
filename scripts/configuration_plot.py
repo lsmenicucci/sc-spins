@@ -1,5 +1,7 @@
 # import packages
 import matplotlib.pyplot as plt
+from scipy import interpolate
+import numpy as np
 
 plt.rcParams['savefig.dpi'] = 500
 
@@ -38,48 +40,60 @@ def plot_current_config_2d(spintronics):
 		return fig, ax
 
 
-def plot_current_setup(spintronics, number_sites = False, selected_spin = None):
+def plot_current_setup(spintronics, mode_3d=True, number_sites = False, selected_spin = None):
 	if(spintronics.check_parameters(0) == 0):
 		print("Can't plot, invalid parameters on module's globals")
 
 	with plt.style.context('bmh'):
 		fig = plt.figure()
-		ax = fig.add_subplot(111, projection='3d')
+		ax = None
+		if(mode_3d):
+			ax = fig.add_subplot(111, projection='3d')
+			ax.scatter(spintronics.rx, spintronics.ry, spintronics.rz, c='b', marker=".")	
+		else:
+			ax = fig.add_subplot(111)
+			ax.set_aspect('equal')
+			ax.scatter(spintronics.rx, spintronics.ry, c='b', marker=".")	
 
-		ax.scatter(spintronics.rx, spintronics.ry, spintronics.rz, c='b', marker=".")	
 
 		if (selected_spin != None):
-			ax.scatter([spintronics.rx[selected_spin]], [spintronics.ry[selected_spin]], [spintronics.rz[selected_spin]], 'ro')	
+			if(mode_3d):
+				ax.plot([spintronics.rx[selected_spin]], [spintronics.ry[selected_spin]], [spintronics.rz[selected_spin]], 'ro')	
+			else:
+				ax.plot([spintronics.rx[selected_spin]], [spintronics.ry[selected_spin]], 'ro')	
 
 			# Plot exc neibs
 			neib_size = spintronics.v_interacts_dip_count[selected_spin]
 			neibs = spintronics.v_interacts_dip
-			
-			print(neibs[:, selected_spin])
 
 			dip_neibs_x = list(map(lambda n: spintronics.rx[n - 1], neibs[:neib_size, selected_spin]))
 			dip_neibs_y = list(map(lambda n: spintronics.ry[n - 1], neibs[:neib_size, selected_spin]))
 			dip_neibs_z = list(map(lambda n: spintronics.rz[n - 1], neibs[:neib_size, selected_spin]))
-			ax.scatter(dip_neibs_x, dip_neibs_y, dip_neibs_z, c='g', marker='o', zorder = 1)
+
+			if(mode_3d):
+				ax.scatter(dip_neibs_x, dip_neibs_y, dip_neibs_z, c='g', marker='o', zorder = 1)
+			else:
+				ax.scatter(dip_neibs_x, dip_neibs_y, c='g', marker='o', zorder = 1)
 
 			# Plot exc neibs
 			neib_size = spintronics.v_interacts_exc_count[selected_spin]
 			neibs = spintronics.v_interacts_exc
-
-			print(neibs[:, selected_spin])
 			
 			exc_neibs_x = list(map(lambda n: spintronics.rx[n - 1], neibs[:neib_size, selected_spin]))
 			exc_neibs_y = list(map(lambda n: spintronics.ry[n - 1], neibs[:neib_size, selected_spin]))
 			exc_neibs_z = list(map(lambda n: spintronics.rz[n - 1], neibs[:neib_size, selected_spin]))
 
-			ax.scatter(exc_neibs_x, exc_neibs_y, exc_neibs_z, c='r', marker="*")
+			if(mode_3d):
+				ax.scatter(exc_neibs_x, exc_neibs_y, exc_neibs_z, c='r', marker="*")
+			else:
+				ax.scatter(exc_neibs_x, exc_neibs_y, c='r', marker="*")
 
 		if(number_sites):
 			n = len(spintronics.sx)
 			for i in range(n):
-				ax.text( spintronics.rx[i], spintronics.ry[i] + 0.2, spintronics.rz[i],
+				positions = [spintronics.rx[i], spintronics.ry[i] + 0.2, spintronics.rz[i]] if (mode_3d) else [spintronics.rx[i], spintronics.ry[i] + 0.2]
+				ax.text(*positions,
 					f"{i + 1}",
 	 				verticalalignment='bottom', horizontalalignment='center',
 					fontsize = 5)
-
 		return fig, ax

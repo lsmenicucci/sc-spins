@@ -11,7 +11,11 @@ MODULE spintronics
     ! Spin & position vectos
     REAL(8), ALLOCATABLE, DIMENSION(:)  :: sx, sy, sz
     REAL(8), ALLOCATABLE, DIMENSION(:)  :: rx, ry, rz
-    
+  
+    ! Spin data
+    REAL(8), ALLOCATABLE, DIMENSION(:)  :: spin 
+
+
     ! Exchange interaction
     REAL(8), ALLOCATABLE, DIMENSION(:, :, :)    :: V_exc
     INTEGER, ALLOCATABLE, DIMENSION(:, :)       :: V_interacts_exc
@@ -48,8 +52,9 @@ MODULE spintronics
         IF(.NOT. ALLOCATED(rx)) RETURN
         IF(.NOT. ALLOCATED(ry)) RETURN
         IF(.NOT. ALLOCATED(rz)) RETURN
+        IF(.NOT. ALLOCATED(spin)) RETURN
         IF(verbose) PRINT *, "Position vectors allocated: OK"
-
+        
         ! Check potential related variables
         IF(.NOT. ALLOCATED(V_interacts_exc)) RETURN
         IF(.NOT. ALLOCATED(V_exc)) RETURN
@@ -159,12 +164,15 @@ MODULE spintronics
         REAL(8) :: theta, sxy, s 
 
         CALL RANDOM_NUMBER(r)
-        
-        ! Set sz
-        sz(i) = 2*r(1) - 1
 
-        sxy = SQRT(1 - sz(i)**2)
-        theta = r(2) * zpi
+        ! Generate a random spin size
+        s = (spin(i) - FLOOR(spin(i))) + FLOOR(spin(i)*r(1))
+
+        ! Set sz
+        sz(i) = s*(2*r(2) - 1)
+
+        sxy = s * SQRT(1 - sz(i)**2)
+        theta = r(3) * zpi
 
         ! Set sx and sy
         sx(i) = sxy * COS(theta)

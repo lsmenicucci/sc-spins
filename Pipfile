@@ -14,6 +14,10 @@ cython = "*"
 pyopengl = "*"
 triangle = "*"
 glumpy = "*"
+h5py = "*"
+schema = "*"
+shortuuid = "*"
+pandas = "*"
 
 [requires]
 python_version = "3.7"

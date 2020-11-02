@@ -1,0 +1,22 @@
+{
+	"task_groups": [
+		{
+			"geometry": {
+				"type": "kekulene",
+				"parameters": {
+					"S_hydrogen": 1.0,
+					"S_carbon": 2.0,
+					"filename": "kekulene.json",
+					"D": -1.0,
+					"J": -1.0,
+					"dipolar_cut": 10.0,
+					"a": 1.0
+				}
+			},
+			"tasks": [
+				{ "parameters": { "beta": 10.0 } },
+				{ "parameters": { "beta": 10.0 } }
+			]
+		}
+	]
+}
