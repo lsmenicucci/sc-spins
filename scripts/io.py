@@ -74,9 +74,10 @@ class SpintronicsSnapshoter:
 
 
 class TaskIO:
-    def __init__(self, filepath):
+    def __init__(self, filefolder, filename):
         logger.debug("Initializing resume writter")
-        self.filepath = filepath
+        self.filename = filename
+        self.filefolder = filefolder
         self.current_dset = None
 
     @staticmethod
@@ -133,19 +134,18 @@ class TaskIO:
         geometry_dset[n_rows, :] = row_data
 
     def save(self, records):
-        logger.debug(f"Writing {len(records)} to file {self.filepath}")
+        logger.debug(f"Writing {len(records)} to file {self.filename}")
 
-        with h5py.File(self.filepath, 'a') as f:
+        filepath = os.path.join(self.filefolder, self.filename)
+        with h5py.File(filepath, 'a') as f:
             for record in records:
                 TaskIO.save_record(f, record)
 
-        logger.debug(f"Writing {len(records)} to file ~{self.filepath}")
-
-        filename = self.filepath.split('/')[-1]
-        filefolders = self.filepath.split('/')[:-1]
+        logger.debug(f"Writing {len(records)} to file ~{self.filename}")
 
         # Save a safe copy
-        with h5py.File(os.path.join(*filefolders, f"~{filename}"), 'a') as f:
+        filepath = os.path.join(self.filefolder, f"~{self.filename}")
+        with h5py.File(filepath, 'a') as f:
             for record in records:
                 TaskIO.save_record(f, record)
 
