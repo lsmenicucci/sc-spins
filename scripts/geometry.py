@@ -106,7 +106,7 @@ def initialize_general_geometry(spintronics, points, a=1.0, dipolar_cut=None, J=
     spintronics.v_interacts_exc_count = -1 * np.ones(n)
 
     # Initialize dipolar interaction vectors
-    spintronics.v_dip = D * np.ones([3, max_exc_dip_count, n])
+    spintronics.v_dip = D * np.ones([max_exc_dip_count, n])
     spintronics.v_interacts_dip = -1 * np.ones([max_exc_dip_count, n])
     spintronics.v_interacts_dip_count = -1 * np.ones(n)
 

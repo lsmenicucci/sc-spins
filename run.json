@@ -1,4 +1,5 @@
 {
+	"output_folder": "test/out",
 	"task_groups": [
 		{
 			"geometry": {
@@ -9,11 +10,21 @@
 					"filename": "kekulene.json",
 					"D": -0.45,
 					"J": -1.0,
-					"dipolar_cut": 10.0,
+					"dipolar_cut": 20.0,
 					"a": 1.0
 				}
 			},
-			"tasks": [{ "parameters": { "beta": 2.0, "mc_steps": 5e4 } }]
+			"tasks": [
+				{
+					"repeat": 2,
+					"parameters": {
+						"beta": 0.25,
+						"mc_steps": 5e4,
+						"measures": 1e3,
+						"mc_inter_steps": 2
+					}
+				}
+			]
 		}
 	]
 }

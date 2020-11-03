@@ -14,8 +14,11 @@ logger.debug('Starting io module')
 
 metadata_scheme = Schema({
     "geometry": {"type": str, "parameters": dict},
-    "parameters": dict
+    "parameters": dict,
+    "output_folder": str
 })
+
+numerical_filter = Schema(Or(int, float))
 
 
 class SpintronicsSnapshoter:
@@ -56,10 +59,14 @@ class SpintronicsSnapshoter:
         snapshot[:, 1] = self.spintronics.ry
         snapshot[:, 2] = self.spintronics.rz
 
-        logger.debug(f"Took snapshot with size {snapshot.shape}")
+        # logger.debug(f"Took snapshot with size {snapshot.shape}")
 
         for (k, v) in kwargs.items():
             snapshot.attrs[k] = v
+
+    def update_attrs(self, **kwargs):
+        for (k, v) in kwargs.items():
+            self.file.attrs[k] = v
 
     def close(self):
         self.file.close()
@@ -74,6 +81,10 @@ class TaskIO:
 
     @staticmethod
     def save_record(file, record):
+        record_geometry = record['geometry']
+        record_geometry['parameters'] = {key: value for (
+            key, value) in record_geometry['parameters'].items() if numerical_filter.is_valid(value)}
+
         geometry_dset = None
         for dset_name in file.keys():
             dset_geometry_parms_zip = zip(
@@ -84,14 +95,17 @@ class TaskIO:
                 "parameters": {x[0]: x[1] for x in dset_geometry_parms_zip}
             }
 
-            if(dset_geometry_data == record["geometry"]):
+            if(dset_geometry_data == record_geometry):
                 geometry_dset = file[dset_name]
                 break
 
         record_data = {key: value for (
-            key, value) in record.items() if key != 'geometry'}
+            key, value) in record.items()
+            if key != 'geometry' and numerical_filter.is_valid(value)}
 
         if(geometry_dset == None):
+            logger.debug(f"Creating dataset for geometry {record['geometry']}")
+
             geometry_dset_name = f"resumes-{shortuuid.uuid()}"
             n_cols = len(record_data)
 
@@ -101,10 +115,13 @@ class TaskIO:
             # Write metadata
             geometry_dset.attrs['columns'] = sorted(record_data.keys())
 
+            numerical_geometry_data = {k: v for (
+                k, v) in record['geometry']['parameters'].items() if numerical_filter.is_valid(v)}
+
             geometry_dset.attrs['geometry-attrs'] = list(
-                record['geometry']['parameters'].keys())
+                numerical_geometry_data.keys())
             geometry_dset.attrs['geometry-parms'] = list(
-                record['geometry']['parameters'].values())
+                numerical_geometry_data.values())
             geometry_dset.attrs['geometry-type'] = record['geometry']['type']
 
         # Reshape for one more entry
@@ -124,8 +141,11 @@ class TaskIO:
 
         logger.debug(f"Writing {len(records)} to file ~{self.filepath}")
 
+        filename = self.filepath.split('/')[-1]
+        filefolders = self.filepath.split('/')[:-1]
+
         # Save a safe copy
-        with h5py.File(f"~{self.filepath}", 'a') as f:
+        with h5py.File(os.path.join(*filefolders, f"~{filename}"), 'a') as f:
             for record in records:
                 TaskIO.save_record(f, record)
 
@@ -133,5 +153,29 @@ class TaskIO:
 def read_input_tasks(filepath):
     with open(filepath, 'r') as f:
         data = json.load(f)
+        tasks = []
+        for group in data["task_groups"]:
+            for task in group['tasks']:
+                taskGeometryParameters = {**group['geometry']["parameters"], **task['geometric_parms']} if('geometric_parms' in task) else group['geometry']["parameters"]
 
-        return data
+                repeat = task['repeat'] if 'repeat' in task else 1
+                for i in range(repeat):
+                    tasks.append({
+                        "output_folder": data["output_folder"],
+                        "parameters": task["parameters"],
+                        "geometry": {**group['geometry'], "parameters": taskGeometryParameters}
+                    })
+
+        return tasks
+
+
+def get_task_filepath(output_folder):
+    task_data_filename = f"task-{shortuuid.uuid()}.h5"
+    task_data_filepath = os.path.join(output_folder, task_data_filename)
+
+    # Ensure colision
+    while(os.path.exists(task_data_filepath)):
+        task_data_filename = f"task-{shortuuid.uuid()}.h5"
+        task_data_filepath = os.path.join(output_folder, task_data_filename)
+
+    return task_data_filepath

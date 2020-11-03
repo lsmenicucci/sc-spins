@@ -9,7 +9,7 @@ This handler is used to deal with logging with mpi4py in Python3.
     https://gist.github.com/JohnCEarls/8172807
 """
 
-#%% mpi4py logging handler
+# %% mpi4py logging handler
 from mpi4py import MPI
 import logging
 import sys
@@ -82,13 +82,15 @@ def get_logger(logger_name):
 
     mh = MPIFileHandler("spintronics.log")
     formatter = logging.Formatter(
-        '%(asctime)s: %(name)s %(levelname)s: %(message)s', "[(%d/%m) %H:%M:%S]")
+        '%(asctime)s - %(name)s %(levelname)s: %(message)s', "(%d/%m) %H:%M:%S")
     mh.setFormatter(formatter)
 
-    stdout_h = logging.StreamHandler(sys.stdout)
-    stdout_h.setFormatter(formatter)
+    if(rank == 0):
+        stdout_h = logging.StreamHandler(sys.stdout)
+        stdout_h.setFormatter(formatter)
+        stdout_h.setLevel(20)
+        logger.addHandler(stdout_h)
 
     logger.addHandler(mh)
-    logger.addHandler(stdout_h)
 
     return logger

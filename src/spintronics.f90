@@ -23,12 +23,13 @@ MODULE spintronics
     INTEGER, ALLOCATABLE, DIMENSION(:)          :: V_interacts_exc_count
 
     ! Dipolar interaction
-    REAL(8), ALLOCATABLE, DIMENSION(:, :, :)    :: V_dip
+    REAL(8), ALLOCATABLE, DIMENSION(:, :)       :: V_dip
     INTEGER, ALLOCATABLE, DIMENSION(:, :)       :: V_interacts_dip
     INTEGER, ALLOCATABLE, DIMENSION(:)          :: V_interacts_dip_count
 
-    ! Log
+    ! Measures
     REAL(8), ALLOCATABLE, DIMENSION(:)  :: energy_log
+    REAL(8), ALLOCATABLE, DIMENSION(:)  :: metropolis_measures
 
     CONTAINS
 
@@ -39,6 +40,7 @@ MODULE spintronics
         LOGICAL :: verbose
 
         INTEGER :: n
+        INTEGER, DIMENSION(2) :: v_shape_2d
         INTEGER, DIMENSION(3) :: v_shape
 
         check_parameters = .FALSE.
@@ -77,16 +79,13 @@ MODULE spintronics
         IF(SIZE(V_interacts_exc_count) /= n) RETURN
         IF(verbose) PRINT *, "Exchange interaction vectors have correct size: OK"
 
-        IF(SIZE(V_dip) < 3*n) RETURN   
-        IF(SIZE(V_interacts_dip)*3 /= SIZE(V_dip)) RETURN   
+        IF(SIZE(V_dip) < n) RETURN   
+        IF(SIZE(V_interacts_dip) /= SIZE(V_dip)) RETURN   
         IF(SIZE(V_interacts_dip_count) /= n) RETURN
         IF(verbose) PRINT *, "Dipolar interaction vectors have correct size: OK"
         
         ! Check shape
         v_shape = SHAPE(V_exc)
-        IF(v_shape(1) /= 3) RETURN
-
-        v_shape = SHAPE(V_dip)
         IF(v_shape(1) /= 3) RETURN
 
         ! Check position vectos
@@ -108,7 +107,7 @@ MODULE spintronics
         INTEGER :: n, i, j
         INTEGER :: neib 
         REAL(8) :: dx, dy, dz, dr
-        REAL(8) :: E_exc, E_dip
+        REAL(8) :: E_exc, E_dip, test
 
         n = SIZE(sx)
 
@@ -136,12 +135,11 @@ MODULE spintronics
                 dz = rz(i) - rz(neib)
                 dr = SQRT(dx*dx + dy*dy + dz*dz)
 
-                E_dip = E_dip + V_dip(1, j, i) * &
-                    (3 * (sx(i) * dx) * (sx(neib) * dx)/dr**5 - sx(i) * sx(neib)/dr**3)
-                E_dip = E_dip + V_dip(2, j, i) * &
-                    (3 * (sy(i) * dy) * (sy(neib) * dy)/dr**5 - sy(i) * sy(neib)/dr**3)
-                E_dip = E_dip + V_dip(3, j, i) * &
-                    (3 * (sz(i) * dz) * (sz(neib) * dz)/dr**5 - sz(i) * sz(neib)/dr**3)
+                E_dip = E_dip + 3 * V_dip(j, i)/dr**5 * &
+                        (sx(i) * dx + sy(i) * dy + sz(i) * dz) * &
+                        (sx(neib) * dx + sy(neib) * dy + sz(neib) * dz)
+                E_dip = E_dip - V_dip(j, i)/dr**3 * &
+                        (sx(i) * sx(neib) + sy(i) * sy(neib) + sz(i) * sz(neib))
             END DO
 
         END DO
@@ -183,22 +181,18 @@ MODULE spintronics
     END SUBROUTINE
 
     !> Perform n steps of metropolis simmulation on the current configuration
-    SUBROUTINE metropolis(steps, beta, mean_energy, mean_mag_x, mean_mag_y, mean_mag_z)
+    SUBROUTINE metropolis(steps, beta)
         !f2py threadsafe
         IMPLICIT NONE   
 
         !> Number of steops
         INTEGER, INTENT(IN) :: steps
         REAL(8), INTENT(IN) :: beta
-        REAL(8), INTENT(OUT) :: mean_energy
-        REAL(8), INTENT(OUT) :: mean_mag_x
-        REAL(8), INTENT(OUT) :: mean_mag_y
-        REAL(8), INTENT(OUT) :: mean_mag_z
-
-
+        
         ! Local variables
         INTEGER :: step, i, j, k, neib
         INTEGER :: n
+        REAL(8) :: mean_energy, mean_mag_x, mean_mag_y, mean_mag_z
 
         ! Iteration state variables
         REAL(8) :: current_energy, delta_energy, r
@@ -261,12 +255,11 @@ MODULE spintronics
                     dz = rz(i) - rz(neib)
                     dr = SQRT(dx*dx + dy*dy + dz*dz)
 
-                    delta_energy = delta_energy + V_dip(1, j, i) * &
-                        (3 * (sx_delta * dx) * (sx(neib) * dx)/dr**5 - sx_delta * sx(neib)/dr**3)
-                    delta_energy = delta_energy + V_dip(2, j, i) * &
-                        (3 * (sy_delta * dy) * (sy(neib) * dy)/dr**5 - sy_delta * sy(neib)/dr**3)
-                    delta_energy = delta_energy + V_dip(3, j, i) * &
-                        (3 * (sz_delta * dz) * (sz(neib) * dz)/dr**5 - sz_delta * sz(neib)/dr**3)
+                    delta_energy = delta_energy + 3 * V_dip(j, i)/dr**5 * &
+                        (sx_delta * dx + sy_delta * dy + sz_delta * dz) * &
+                        (sx(neib) * dx + sy(neib) * dy + sz(neib) * dz)
+                    delta_energy = delta_energy - V_dip(j, i)/dr**3 * &
+                        (sx_delta * sx(neib) + sy_delta * sy(neib) + sz_delta * sz(neib))
                 END DO
 
                 ! Update energy
@@ -287,13 +280,21 @@ MODULE spintronics
                     END IF
                 END IF
             END DO
-
+            
             mean_energy = mean_energy + current_energy/DBLE(steps)
             mean_mag_x = mean_mag_x + SUM(sx)/DBLE(steps)
             mean_mag_y = mean_mag_y + SUM(sy)/DBLE(steps)
             mean_mag_z = mean_mag_z + SUM(sz)/DBLE(steps)
 
         END DO
+
+        ! Save measurements
+        IF(.NOT. ALLOCATED(metropolis_measures)) ALLOCATE(metropolis_measures(4))
+       
+        metropolis_measures(1) = mean_energy
+        metropolis_measures(2) = mean_mag_x
+        metropolis_measures(3) = mean_mag_y
+        metropolis_measures(4) = mean_mag_z
 	END SUBROUTINE
 
     !> Calculates the spin commutator with H for a given configuration 
@@ -350,14 +351,16 @@ MODULE spintronics
                 rcy = dz * spin_x(i) - spin_z(i) * dx
                 rcz = dx * spin_y(i) - spin_x(i) * dy
 
-                commu_x(i) = commu_x(i) + V_dip(1, j, i) * &
+                !!! THIS IS WRONG, CHECK  OUT !!!
+                commu_x(i) = commu_x(i) + V_dip(j, i) * &
                         (3 * rcx * (spin_x(neib) * dx)/dr**5 - cx/dr**3)
 
-                commu_y(i) = commu_y(i) + V_dip(2, j, i) * &
+                commu_y(i) = commu_y(i) + V_dip(j, i) * &
                         (3 * rcy * (spin_y(neib) * dy)/dr**5 - cy/dr**3)
 
-                commu_z(i) = commu_z(i) + V_dip(3, j, i) * &
+                commu_z(i) = commu_z(i) + V_dip(j, i) * &
                         (3 * rcz * (spin_z(neib) * dz)/dr**5 - cz/dr**3)
+
             END DO
         END DO
 
