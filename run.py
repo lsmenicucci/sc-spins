@@ -95,7 +95,7 @@ def run_task(task):
 
 if __name__ == '__main__':
     tasks = read_input_tasks('./run.json')
-    resumes = TaskIO(path.join(tasks[0]['output_folder'], 'resumes.h5'))
+    resumes = TaskIO(tasks[0]['output_folder'], 'resumes.h5')
 
     with MPIPoolExecutor(max_workers=2) as executor:
         res = executor.map(run_task, tasks)
