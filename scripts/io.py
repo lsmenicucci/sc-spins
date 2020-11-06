@@ -4,9 +4,13 @@ import h5py
 import shortuuid
 from schema import Schema, Or
 import json
+from itertools import product
+from functools import reduce
+import numpy as np
 
 # local scripts
 from scripts.mpi_logger import get_logger
+from . import schemes
 
 # Get MPI communicator
 logger = get_logger('io')
@@ -150,23 +154,64 @@ class TaskIO:
                 TaskIO.save_record(f, record)
 
 
+def expand_parameter_in_sequence(parameter):
+    if schemes.numeric_sequence.is_valid(parameter):
+        n = max(0, np.rint(
+            (parameter['to'] - parameter['from'])/parameter['by']))
+        n = int(n)
+
+        if(parameter['from'] + n*parameter['by'] <= parameter['to']):
+            n += 1
+
+        return np.linspace(parameter['from'], parameter['to'], n)
+    else:
+        return [parameter]
+
+
+def merge(acc, cur):
+    return dict(acc, **cur)
+
+
 def read_input_tasks(filepath):
+    data = None
     with open(filepath, 'r') as f:
         data = json.load(f)
-        tasks = []
-        for group in data["task_groups"]:
-            for task in group['tasks']:
-                taskGeometryParameters = {**group['geometry']["parameters"], **task['geometric_parms']} if('geometric_parms' in task) else group['geometry']["parameters"]
 
-                repeat = task['repeat'] if 'repeat' in task else 1
-                for i in range(repeat):
-                    tasks.append({
-                        "output_folder": data["output_folder"],
-                        "parameters": task["parameters"],
-                        "geometry": {**group['geometry'], "parameters": taskGeometryParameters}
-                    })
+    try:
+        logger.info(f"Validating task file: {filepath}")
+        schemes.task_file_scheme.validate(data)
+        logger.info("Task file is valid")
+    except Exception as e:
+        logger.error(f"Invalid task file: {filepath}")
+        logger.error(f"Scheme error {getattr(e, 'message', str(e))}")
+        raise e
 
-        return tasks
+    tasks = []
+
+    for task_data in data['tasks']:
+        geometry_parms = [
+            [{k: v} for v in expand_parameter_in_sequence(parm)] for k, parm in task_data['geometry']["parameters"].items()
+        ]
+
+        task_parms = [
+            [{k: v} for v in expand_parameter_in_sequence(parm)] for k, parm in task_data["parameters"].items()
+        ]
+
+        repeat = task_data['repeat'] if 'repeat' in task_data else 1
+        for geom_parm_point in product(*geometry_parms):
+            for task_parms_point in product(*task_parms):
+
+                task = {
+                    "output_folder": data['output_folder'],
+                    "geometry": {
+                        "type": task_data['geometry']["type"],
+                        "parameters": reduce(merge, [task_data['geometry']["parameters"], *geom_parm_point])
+                    },
+                    "parameters": reduce(merge, [task_data["parameters"], *task_parms_point])
+                }
+                for r in range(repeat):
+                    tasks.append(task)
+    return {"tasks": tasks, "pool_size": data["pool_size"]}
 
 
 def get_task_filepath(output_folder):

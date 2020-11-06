@@ -1,2 +1,9 @@
 *.so
 *.log
+
+# Data
+data/*
+test/*
+
+# Jupyter notebooks
+.ipynb_checkpoints

@@ -1,8 +1,6 @@
 # import packages
 import numpy as np
-import pandas as pd
-from matplotlib import pyplot as plt
-import matplotlib as mpl
+import datetime
 import time
 import logging
 import sys
@@ -20,9 +18,6 @@ from scripts.mpi_logger import MPIFileHandler, get_logger
 from scripts.interactive import InteractiveView
 from scripts.io import SpintronicsSnapshoter, TaskIO, read_input_tasks, get_task_filepath
 
-# mpl.use("TkAgg")
-mpl.use("Agg")
-
 logger = get_logger('main')
 
 
@@ -34,8 +29,6 @@ class SpintronicsDynamics(threading.Thread):
     def run(self):
         results = spintronics.metropolis(int(1e5), 0.25)
 
-
-plt.rcParams['savefig.dpi'] = 500
 
 kekulene_vortex_path = np.array(range(32, 49), dtype=np.int8)
 
@@ -51,8 +44,11 @@ def run_task(task):
     logger.info(f'Thermalizing the system')
     t_start = time.time()
 
+    beta = task['parameters']["beta"] if 'beta' in task['parameters'] else 1 / \
+        task['parameters']["T"]
+
     results = spintronics.metropolis(
-        int(task['parameters']['mc_steps']), task['parameters']["beta"])
+        int(task['parameters']['mc_steps']), beta)
 
     logger.info(f"Thermalization done in {time.time() - t_start:7.2f} seconds")
 
@@ -63,13 +59,13 @@ def run_task(task):
     vortexes = 0
     for i in range(int(task['parameters']['measures'])):
         results = spintronics.metropolis(
-            int(task['parameters']['mc_inter_steps']), task['parameters']["beta"])
+            int(task['parameters']['mc_inter_steps']), beta)
 
         has_vortex = spintronics.has_vortex(kekulene_vortex_path) != 0
         if(has_vortex):
             vortexes += 1
 
-        camera.snapshot(beta=task['parameters']["beta"], has_vortex=has_vortex)
+        camera.snapshot(beta=beta, has_vortex=has_vortex)
 
     logger.info(f"Measurement done in {time.time() - t_start:7.2f} seconds")
 
@@ -94,9 +90,17 @@ def run_task(task):
 
 
 if __name__ == '__main__':
-    tasks = read_input_tasks('./run.json')
+    t_start = time.time()
+
+    input_data = read_input_tasks('./run.json')
+    tasks = input_data['tasks']
+    pool_size = input_data['pool_size']
+
     resumes = TaskIO(tasks[0]['output_folder'], 'resumes.h5')
 
-    with MPIPoolExecutor(max_workers=2) as executor:
+    logger.debug(f"Starting {pool_size} mpi workers")
+
+    with MPIPoolExecutor(max_workers=pool_size) as executor:
         res = executor.map(run_task, tasks)
         resumes.save(list(res))
+    logger.info(f"All tasks done. Duration: {str(datetime.timedelta(seconds=time.time() - t_start))}")

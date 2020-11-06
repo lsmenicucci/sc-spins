@@ -1,30 +1,27 @@
 {
+	"pool_size": 2,
 	"output_folder": "test/out",
-	"task_groups": [
+	"tasks": [
 		{
+			"repeat": 5,
 			"geometry": {
 				"type": "kekulene",
 				"parameters": {
 					"S_hydrogen": 2.0,
 					"S_carbon": 2.5,
 					"filename": "kekulene.json",
-					"D": -0.45,
+					"D": -0.5,
 					"J": -1.0,
 					"dipolar_cut": 20.0,
 					"a": 1.0
 				}
 			},
-			"tasks": [
-				{
-					"repeat": 2,
-					"parameters": {
-						"beta": 0.25,
-						"mc_steps": 5e4,
-						"measures": 1e3,
-						"mc_inter_steps": 2
-					}
-				}
-			]
+			"parameters": {
+				"T": 1.5,
+				"mc_steps": 1e5,
+				"measures": 1e3,
+				"mc_inter_steps": 1e3
+			}
 		}
 	]
 }

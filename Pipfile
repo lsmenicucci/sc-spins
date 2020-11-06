@@ -18,6 +18,7 @@ h5py = "*"
 schema = "*"
 shortuuid = "*"
 pandas = "*"
+jupyterlab = "*"
 
 [requires]
 python_version = "3.7"
