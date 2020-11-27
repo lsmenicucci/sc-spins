@@ -155,7 +155,7 @@ class TaskIO:
 
 
 def expand_parameter_in_sequence(parameter):
-    if schemes.numeric_sequence.is_valid(parameter):
+    if schemes.expandable_sequence.is_valid(parameter) or schemes.numeric_sequence.is_valid(parameter):
         n = max(0, np.rint(
             (parameter['to'] - parameter['from'])/parameter['by']))
         n = int(n)
@@ -163,7 +163,10 @@ def expand_parameter_in_sequence(parameter):
         if(parameter['from'] + n*parameter['by'] <= parameter['to']):
             n += 1
 
-        return np.linspace(parameter['from'], parameter['to'], n)
+        if(schemes.numeric_sequence.is_valid(parameter)):
+            return [np.linspace(parameter['from'], parameter['to'], n)]
+        else:
+            return np.linspace(parameter['from'], parameter['to'], n)
     else:
         return [parameter]
 

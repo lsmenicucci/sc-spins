@@ -29,6 +29,15 @@ parameters_schemas = {
         "J": float,
         "D": float
     }),
+    "rectangle": Schema({
+        "H": int,
+        "W": int,
+        "layers": int,
+        "a": float,
+        "dipolar_cut": float,
+        "J": float,
+        "D": float
+    }),
     "line": Schema({
         "L": int,
         "a": float,
@@ -170,6 +179,28 @@ def initialize_square_layers(spintronics, parameters):
     return {"type": "square", "parameters": parameters}
 
 
+def initialize_rectangular_layers(spintronics, parameters):
+    try:
+        parameters_schemas["rectangle"].validate(parameters)
+    except Exception as e:
+        logger.error(f"Error validating geometry parameters: {getattr(e, 'message', str(e))}")
+        raise
+
+    logger.info(
+        f'Initializing rectangular geometry with {parameters["layers"]} layers and sides = {parameters["W"]}, {parameters["H"]}')
+
+    wlimit = int(np.round(float(parameters["W"]) / 2.0))
+    hlimit = int(np.round(float(parameters["H"]) / 2.0))
+
+    points = [(i * parameters["a"], j * parameters["a"], k * parameters["a"])
+              for k in range(parameters["layers"])
+              for j in range(-hlimit, hlimit + 1)
+              for i in range(-wlimit, wlimit + 1)]
+
+    initialize_general_geometry(spintronics, points, **parameters)
+    return {"type": "rectangle", "parameters": parameters}
+
+
 def initialize_line(spintronics, parameters):
     try:
         parameters_schemas["line"].validate(parameters)
@@ -236,6 +267,8 @@ def initialize(spintronics, geometryType, parameters):
         return initialize_square_layers(spintronics, parameters)
     elif(geometryType == 'line'):
         return initialize_line(spintronics, parameters)
+    elif(geometryType == 'rectangle'):
+        return initialize_rectangular_layers(spintronics, parameters)
     elif(geometryType == 'kekulene'):
         return initialize_organic_molecule(spintronics, parameters)
     else:

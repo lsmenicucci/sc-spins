@@ -27,7 +27,7 @@ class SpintronicsDynamics(threading.Thread):
         self.spintronics = spintronics
 
     def run(self):
-        results = spintronics.metropolis(int(1e5), 0.25)
+        spintronics.metropolis(int(1e5), 0.25)
 
 
 kekulene_vortex_path = np.array(range(32, 49), dtype=np.int8)
@@ -89,18 +89,43 @@ def run_task(task):
     }
 
 
+def run_interactive():
+    # initialize geometry first
+    sim_parms = {
+        "W": 30,
+        "H": 10,
+        "layers": 1,
+        "a": 1.0,
+        "dipolar_cut": 9999.9,
+        "J": -1.0,
+        "D": -0.1,
+    }
+    initialize_geometry(spintronics, 'rectangle', sim_parms)
+
+    thread_sim = SpintronicsDynamics(spintronics)
+    thread_int = InteractiveView(spintronics)
+
+    thread_sim.start()
+    thread_int.start()
+
+
 if __name__ == '__main__':
+    run_interactive()
+    sys.exit()
+
     t_start = time.time()
 
     input_data = read_input_tasks('./run.json')
     tasks = input_data['tasks']
     pool_size = input_data['pool_size']
 
-    resumes = TaskIO(tasks[0]['output_folder'], 'resumes.h5')
+    print(tasks[0])
 
-    logger.debug(f"Starting {pool_size} mpi workers")
+    # resumes = TaskIO(tasks[0]['output_folder'], 'resumes.h5')
 
-    with MPIPoolExecutor(max_workers=pool_size) as executor:
-        res = executor.map(run_task, tasks)
-        resumes.save(list(res))
-    logger.info(f"All tasks done. Duration: {str(datetime.timedelta(seconds=time.time() - t_start))}")
+    # logger.debug(f"Starting {pool_size} mpi workers")
+
+    # with MPIPoolExecutor(max_workers=pool_size) as executor:
+    #     res = executor.map(run_task, tasks)
+    #     resumes.save(list(res))
+    # logger.info(f"All tasks done. Duration: {str(datetime.timedelta(seconds=time.time() - t_start))}")
