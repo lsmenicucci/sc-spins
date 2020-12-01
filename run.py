@@ -9,6 +9,8 @@ import shortuuid
 from os import path
 from mpi4py import MPI
 from mpi4py.futures import MPIPoolExecutor
+import matplotlib.pyplot as plt 
+import matplotlib as mpl
 
 # local packages
 from spintronics import spintronics
@@ -17,6 +19,8 @@ from scripts.geometry import initialize as initialize_geometry
 from scripts.mpi_logger import MPIFileHandler, get_logger
 from scripts.interactive import InteractiveView
 from scripts.io import SpintronicsSnapshoter, TaskIO, read_input_tasks, get_task_filepath
+
+mpl.use("TkAgg")
 
 logger = get_logger('main')
 
@@ -27,7 +31,27 @@ class SpintronicsDynamics(threading.Thread):
         self.spintronics = spintronics
 
     def run(self):
-        spintronics.metropolis(int(1e5), 0.25)
+        spintronics.metropolis(int(1e4), 0.25) 
+
+        logger.info("Integrating")
+
+        T, dt = 20.0, 1e-3
+        spintronics.integrate(T, dt)
+
+        logger.info("Saving log plot")
+
+        print(len(spintronics.energy_log[:]))
+
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+        ax.plot(np.linspace(4*dt, T, len(spintronics.energy_log[:])), spintronics.energy_log[:], '-')
+        ax.grid(True)
+
+        ax.set_xlabel("t")
+        ax.set_ylabel("Energy")
+        
+        plt.show()
+
 
 
 kekulene_vortex_path = np.array(range(32, 49), dtype=np.int8)
@@ -96,21 +120,32 @@ def run_interactive():
         "H": 10,
         "layers": 1,
         "a": 1.0,
-        "dipolar_cut": 9999.9,
+        "dipolar_cut": 10.0,
         "J": -1.0,
-        "D": -0.1,
+        "D": -0.2,
     }
+
+    # sim_parms = {
+    #     "L": 10,
+    #     "a": 1.0,
+    #     "dipolar_cut": 1.1,
+    #     "J": -1.0,
+    #     "D": 0.0
+    # }
+
     initialize_geometry(spintronics, 'rectangle', sim_parms)
 
-    thread_sim = SpintronicsDynamics(spintronics)
-    thread_int = InteractiveView(spintronics)
 
-    thread_sim.start()
-    thread_int.start()
+    thread_sim = SpintronicsDynamics(spintronics)
+    #thread_int = InteractiveView(spintronics)
+
+    thread_sim.run()
+    #thread_int.start()
 
 
 if __name__ == '__main__':
     run_interactive()
+    
     sys.exit()
 
     t_start = time.time()

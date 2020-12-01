@@ -4,6 +4,10 @@
 # Data
 data/*
 test/*
+run.json
+hostfile
+*.png
+*.pdf
 
 # Jupyter notebooks
 .ipynb_checkpoints

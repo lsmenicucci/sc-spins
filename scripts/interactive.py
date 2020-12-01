@@ -11,18 +11,26 @@ vertex = """
 uniform vec2 resolution;
 attribute float rx;
 attribute float ry;
+
 attribute float sx;
 attribute float sy;
+attribute float sz;
+
 varying float v_rx;
 varying float v_ry;
+
 varying float v_sx;
 varying float v_sy;
+varying float v_sz;
 void main()
 {
     v_rx = rx;
     v_ry = ry;
+
     v_sx = sx;
     v_sy = sy;
+    v_sz = sz;
+
     gl_PointSize = 15.0;
     gl_Position = vec4(vec2(rx, ry), 0.0, 1.0);
 } """
@@ -34,8 +42,10 @@ fragment = """
 
 varying float v_rx;
 varying float v_ry;
+
 varying float v_sx;
 varying float v_sy;
+varying float v_sz;
 void main()
 { 
     const float M_PI = 3.14159265358979323846;
@@ -44,6 +54,9 @@ void main()
     const float antialias =  1.0;
     const float body = 15;
 
+    float perpendicular = v_sx/0.5;
+    float intensity = sqrt(v_sx*v_sx + v_sy*v_sy + v_sz*v_sz)/0.5;
+    
     vec2 texcoord = gl_FragCoord.xy;
     vec2 center = (2*gl_PointCoord.xy - 1)*size + texcoord.xy;
 
@@ -55,7 +68,7 @@ void main()
                     sin_theta*texcoord.x + cos_theta*texcoord.y);
 
     float d = arrow_stealth(texcoord, body, 0.25*body, linewidth, antialias);
-    gl_FragColor = filled(d, linewidth, antialias, vec4(0,0,0,1));
+    gl_FragColor = filled(d, linewidth, antialias, vec4(perpendicular, 0.0, -perpendicular, intensity));
 } """
 
 class InteractiveView(threading.Thread):
@@ -70,16 +83,17 @@ class InteractiveView(threading.Thread):
         self.ry = spintronics.ry/max_dim * 0.9
         self.sx = spintronics.sx
         self.sy = spintronics.sy
-
-        print(f"max rx: {np.max(self.rx)}")
+        self.sz = spintronics.sz
 
     def run(self):
         window = app.Window(512, 512, color=(1,1,1,1))
         points = gloo.Program(vertex, fragment)
         points["rx"] = self.rx
         points["ry"] = self.ry
+
         points["sx"] = self.sx
         points["sy"] = self.sy
+        points["sz"] = self.sz
 
         @window.event
         def on_resize(width, height):
@@ -89,6 +103,8 @@ class InteractiveView(threading.Thread):
         def on_draw(dt):
             points["sx"] = self.sx
             points["sy"] = self.sy
+            points["sz"] = self.sz
+
             window.clear()
             points.draw(gl.GL_POINTS)
 
