@@ -31,16 +31,14 @@ class SpintronicsDynamics(threading.Thread):
         self.spintronics = spintronics
 
     def run(self):
-        spintronics.metropolis(int(1e4), 0.25) 
+        spintronics.metropolis(int(1e5), 1/2.0) 
 
         logger.info("Integrating")
 
-        T, dt = 20.0, 1e-3
+        T, dt = 100.0, 1e-3
         spintronics.integrate(T, dt)
 
         logger.info("Saving log plot")
-
-        print(len(spintronics.energy_log[:]))
 
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
@@ -50,7 +48,7 @@ class SpintronicsDynamics(threading.Thread):
         ax.set_xlabel("t")
         ax.set_ylabel("Energy")
         
-        plt.show()
+        fig.savefig("run.png")
 
 
 
@@ -116,13 +114,13 @@ def run_task(task):
 def run_interactive():
     # initialize geometry first
     sim_parms = {
-        "W": 30,
-        "H": 10,
-        "layers": 1,
-        "a": 1.0,
-        "dipolar_cut": 10.0,
+       "S_hydrogen": 2.0,
+        "S_carbon": 2.5,
+        "filename": "kekulene.json",
+        "D": -0.5,
         "J": -1.0,
-        "D": -0.2,
+        "dipolar_cut": 20.0,
+        "a": 1.0
     }
 
     # sim_parms = {
@@ -133,14 +131,14 @@ def run_interactive():
     #     "D": 0.0
     # }
 
-    initialize_geometry(spintronics, 'rectangle', sim_parms)
+    initialize_geometry(spintronics, 'kekulene', sim_parms)
 
 
     thread_sim = SpintronicsDynamics(spintronics)
-    #thread_int = InteractiveView(spintronics)
+    thread_int = InteractiveView(spintronics)
 
-    thread_sim.run()
-    #thread_int.start()
+    thread_sim.start()
+    thread_int.start()
 
 
 if __name__ == '__main__':

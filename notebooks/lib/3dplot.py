@@ -7,7 +7,7 @@ import mpl_toolkits.mplot3d.axis3d
 from mpl_toolkits.mplot3d.axis3d import Axis
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-from matplotlib.text import TextPath
+from matplotlib.text import TextPath, Text
 from matplotlib.transforms import Affine2D
 from matplotlib.patches import Rectangle, Circle, PathPatch
 from matplotlib.font_manager import FontProperties
@@ -34,10 +34,10 @@ def text3d(ax, xyz, s, zdir="z", size=None, angle=0, usetex=False, **kwargs):
     else:
         xy1, z1 = (x, y), z
 
-    text_path = TextPath((0, 0), s, size=0.2, usetex=usetex, edgecolor=None)
+    text_path = TextPath((0, 0), s, size=size, usetex=usetex)
     trans = Affine2D().rotate(angle).translate(xy1[0], xy1[1])
 
-    p1 = PathPatch(trans.transform_path(text_path))
+    p1 = PathPatch(trans.transform_path(text_path), antialiased = True, lw = 0)
     ax.add_patch(p1)
     art3d.pathpatch_2d_to_3d(p1, z=z1, zdir=zdir)
 
@@ -117,8 +117,6 @@ def plot_manual_frame(ax, lw=0.5, tick_size=2.0, tick_thickness=0.8):
 
     tick_zip = zip(dimensions, facings, [xticks, yticks, zticks], centers)
 
-    text3d(ax, (0, 0, 0), 'teste', 'z', size=5)
-
     for i, (axis_dim, zidx, ticks, center) in enumerate(tick_zip):
         other_direction = missing_direction(i, zidx)
 
@@ -135,13 +133,23 @@ def plot_manual_frame(ax, lw=0.5, tick_size=2.0, tick_thickness=0.8):
                       tick_width, inout_factor * tick_height, color='k')
 
             # plot tick label
-            tick_label_center = [tick, 0, tick_center[zidx]]
-            tick_label_center[0] += inout_factor * tick_height * 0.5
+            tick_label_center = [0, 0, 0]
+            tick_label_center[zidx] = tick_center[zidx]
+            tick_label_center[i] = tick + inout_factor * tick_height * 0.25
+
+            if(inout_factor == 1):
+                tick_label_center[other_direction] = dimensions[other_direction]
+
+            tick_label_center[other_direction] += inout_factor * dimensions[other_direction] * tick_width
             tick_dir = ['x', 'y', 'z'][zidx]
             angle = np.pi/2 if i == 0 else 0
 
-            text3d(ax, tick_label_center, f"{tick:3.2f}", zdir=tick_dir, angle=angle, size=tick_width * 1e-4, fc='k')
+            text3d(ax, tick_label_center, f"{tick:2.0f}".replace(' ', ''), 
+                zdir=tick_dir,
+                angle=angle, 
+                size= tick_width * dimensions[i], fc='k')
 
+        
     return
 
 

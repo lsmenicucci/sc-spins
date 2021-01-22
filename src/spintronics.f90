@@ -130,8 +130,6 @@ MODULE spintronics
             ! Calculate dipolar energy
             DO j = 1, V_interacts_dip_count(i)
 
-                cycle
-
                 neib = V_interacts_dip(j, i)
 
                 dx = rx(i) - rx(neib)
@@ -168,8 +166,10 @@ MODULE spintronics
 
         CALL RANDOM_NUMBER(r)
 
-        ! Generate a random spin size
-        s = (spin(i) - FLOOR(spin(i))) + REAL(NINT(spin(i)*r(1)))
+        ! Generate a random spin size (DISABLED)
+        !s = (spin(i) - FLOOR(spin(i))) + REAL(NINT(spin(i)*r(1)))
+
+        s = spin(i)
 
         ! Set sz and sxy
         sz(i) = 2 * r(2) - 1
@@ -340,8 +340,6 @@ MODULE spintronics
             ! Sum dipolar contribution
             DO j = 1, V_interacts_dip_count(i)
 
-                CYCLE
-
                 neib = V_interacts_dip(j, i)
 
                 dx = rx(i) - rx(neib)
@@ -350,13 +348,13 @@ MODULE spintronics
                 dr = SQRT(dx*dx + dy*dy + dz*dz)
 
                 ! Compute terms
-                cx = spin_y(neib) * spin_z(i) - spin_y(i) * spin_z(neib)
-                cy = spin_z(neib) * spin_x(i) - spin_z(i) * spin_x(neib)
-                cz = spin_x(neib) * spin_y(i) - spin_x(i) * spin_y(neib)
+                cx = spin_y(i) * spin_z(neib) - spin_y(neib) * spin_z(i)
+                cy = spin_z(i) * spin_x(neib) - spin_z(neib) * spin_x(i)
+                cz = spin_x(i) * spin_y(neib) - spin_x(neib) * spin_y(i)
 
-                crx = dy * spin_z(i) - spin_y(i) * dz
-                cry = dz * spin_x(i) - spin_z(i) * dx
-                crz = dx * spin_y(i) - spin_x(i) * dy
+                crx = spin_y(i) * dz - dy * spin_z(i)
+                cry = spin_z(i) * dx - dz * spin_x(i)
+                crz = spin_x(i) * dy - dx * spin_y(i)
 
                 ! Compute neib dipolar term
                 neib_dipolar_term = spin_x(neib) * dx + spin_y(neib) * dy + spin_z(neib) * dz

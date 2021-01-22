@@ -91,7 +91,7 @@ def initialize_general_geometry(spintronics, points, a=1.0, dipolar_cut=None, J=
     spintronics.sz = np.ones(n)
 
     # Initialize spin constants
-    spintronics.spin = np.ones(n)
+    spintronics.spin = np.ones(n) * 0.5
 
     if('spin' in kwargs):
         spintronics.spin = kwargs["spin"]
